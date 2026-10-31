@@ -60,10 +60,17 @@ export default function TriageForm() {
 
   return (
     <div className="max-w-3xl mx-auto p-6 bg-white shadow-md rounded-lg">
-      <h1 className="text-2xl font-bold mb-2">Nuevo paciente</h1>
-      <p className="text-gray-600 mb-6">
-        Completá los campos para evaluar el nivel de urgencia
-      </p>
+      <div className="flex items-center justify-between border-b pb-3 mb-4">
+        <div>
+          <h1 className="text-2xl font-bold">Nuevo paciente</h1>
+          <p className="text-gray-600 text-sm mt-1">
+            Evaluación de urgencia con Inteligencia Artificial asistida por RAG
+          </p>
+        </div>
+        <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full border border-green-300">
+          ● RAG Clínico Activo
+        </span>
+      </div>
 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -264,12 +271,25 @@ export default function TriageForm() {
           </div>
         </div>
 
+        {loading && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-center gap-3">
+            <svg className="animate-spin h-5 w-5 text-blue-600 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <div>
+              <p className="font-semibold">Evaluando con Inteligencia Artificial (RAG)...</p>
+              <p className="text-xs text-blue-600 mt-0.5">Recuperando protocolos clínicos oficiales y clasificando el nivel de prioridad.</p>
+            </div>
+          </div>
+        )}
+
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed shadow-sm"
         >
-          {loading ? "Procesando..." : "Analizar con IA →"}
+          {loading ? "Procesando triage con RAG..." : "Evaluar Triage Clínico (RAG) →"}
         </button>
       </form>
     </div>

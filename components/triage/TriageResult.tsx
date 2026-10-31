@@ -27,6 +27,7 @@ interface ResultadoTriage {
   acciones: string[];
   alarmas: string[];
   tiempo_espera: string;
+  fuentes_rag?: string[];
 }
 
 export default function TriageResult() {
@@ -108,11 +109,36 @@ export default function TriageResult() {
 
       {/* Secciones */}
       <div className="space-y-6">
+        {/* Sección RAG: Protocolos y Guías Clínicas Consultadas */}
+        {resultado.fuentes_rag && resultado.fuentes_rag.length > 0 && (
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">📚</span>
+              <h3 className="font-semibold text-blue-900 text-sm tracking-wide uppercase">
+                Base de Conocimiento RAG · Protocolos Clínicos Aplicados
+              </h3>
+            </div>
+            <p className="text-xs text-blue-700 mb-3">
+              Esta evaluación fue fundamentada contrastando los signos vitales y síntomas con los siguientes documentos normativos:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {resultado.fuentes_rag.map((fuente, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-blue-300 text-blue-800 text-xs font-medium rounded-full shadow-sm"
+                >
+                  📄 {fuente}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <h3 className="font-semibold text-lg border-b pb-1">
             Justificación clínica
           </h3>
-          <p className="mt-2 text-gray-700">{resultado.justificacion}</p>
+          <p className="mt-2 text-gray-700 whitespace-pre-line">{resultado.justificacion}</p>
         </div>
 
         <div>

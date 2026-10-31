@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { recuperarContextoTriage, DatosPacienteRAG } from '@/lib/triage-rag';
+
+export const dynamic = 'force-dynamic';
 
 // ============================================================
 // 1. Definimos la estructura de datos que esperamos del frontend
@@ -19,59 +22,56 @@ interface DatosPaciente {
 }
 
 // ============================================================
-// 2. Función para construir el prompt para Ollama
+// 2. Función para construir el prompt enriquecido con RAG para Ollama
 // ============================================================
-function construirPrompt(datos: DatosPaciente): string {
+function construirPromptRAG(datos: DatosPaciente, contextoRAG: string): string {
   return `
-Eres un experto en triage clínico. Basándote en los siguientes datos del paciente, 
-debes asignar un nivel de urgencia (I a V) y proporcionar recomendaciones.
+Eres un médico experto en Triage de Urgencias. Clasifica al paciente según los siguientes protocolos de referencia:
 
-Datos del paciente:
-- Nombre: ${datos.nombre}
-- Edad: ${datos.edad} años
-- Sexo: ${datos.sexo}
-- Motivo de consulta: ${datos.motivo}
-- Frecuencia cardíaca: ${datos.fc} lpm
-- Frecuencia respiratoria: ${datos.fr} rpm
-- SpO₂: ${datos.spo2} %
-- Tensión arterial: ${datos.ta} mmHg
-- Temperatura: ${datos.temp} °C
-- Glasgow: ${datos.glasgow}/15
-- Antecedentes: ${datos.antecedentes}
+[PROTOCOLOS OFICIALES (RAG)]:
+${contextoRAG}
 
-Responde ÚNICAMENTE con un objeto JSON con la siguiente estructura exacta:
+[DATOS PACIENTE]:
+- Nombre: ${datos.nombre}, Edad: ${datos.edad} años, Sexo: ${datos.sexo || 'N/E'}
+- Motivo: ${datos.motivo}
+- Signos vitales: FC ${datos.fc} lpm, FR ${datos.fr} rpm, SpO2 ${datos.spo2}%, TA ${datos.ta} mmHg, Temp ${datos.temp}°C, Glasgow ${datos.glasgow}/15
+- Antecedentes: ${datos.antecedentes || 'Sin antecedentes'}
+
+Devuelve EXCLUSIVAMENTE un JSON válido (sin explicaciones adicionales fuera del JSON):
 {
   "nivel": "I" | "II" | "III" | "IV" | "V",
   "color": "ROJO" | "NARANJA" | "AMARILLO" | "VERDE" | "AZUL",
   "emoji": "🔴" | "🟠" | "🟡" | "🟢" | "🔵",
   "clase_css": "nivel-rojo" | "nivel-naranja" | "nivel-amarillo" | "nivel-verde" | "nivel-azul",
-  "justificacion": "Texto breve explicando por qué se asigna este nivel",
-  "acciones": ["Acción 1", "Acción 2", "Acción 3"],
-  "alarmas": ["Alarma 1", "Alarma 2"],
-  "tiempo_espera": "texto del tiempo de espera estimado"
-}
-
-No incluyas texto adicional, solo el JSON.`;
+  "justificacion": "Explicación breve citando el protocolo o discriminador clínico aplicado",
+  "acciones": ["Acción médica 1", "Acción médica 2"],
+  "alarmas": ["Signo alarma 1", "Signo alarma 2"],
+  "tiempo_espera": "tiempo de espera según protocolo (ej. 10 a 15 min)",
+  "fuentes_rag": ["protocolo_aplicado"]
+}`;
 }
 
 // ============================================================
 // 3. Función para consultar Ollama
 // ============================================================
 async function consultarOllama(prompt: string): Promise<any> {
-  const url = 'http://127.0.0.1:11434/api/chat';
+  const url = process.env.OLLAMA_BASE_URL 
+    ? `${process.env.OLLAMA_BASE_URL}/api/chat`
+    : 'http://127.0.0.1:11434/api/chat';
   
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'gemma2',  // o 'argano-contract-assistant' si lo tienes
+      model: 'gemma2',
       messages: [
-        { role: 'system', content: 'Eres un asistente experto en triage clínico. Siempre respondes en formato JSON.' },
+        { role: 'system', content: 'Eres un asistente experto en triage clínico basado en evidencia y protocolos. Siempre respondes exclusivamente en formato JSON válido.' },
         { role: 'user', content: prompt }
       ],
       stream: false,
       options: {
-        temperature: 0.1,  // Bajo para respuestas más deterministas
+        temperature: 0.1,
+        num_predict: 400,
       }
     })
   });
@@ -82,10 +82,8 @@ async function consultarOllama(prompt: string): Promise<any> {
   }
 
   const data = await response.json();
-  // En /api/chat, la respuesta está en data.message.content
   const content = data.message?.content || '';
   
-  // Intentamos extraer el JSON de la respuesta (por si hay texto adicional)
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     throw new Error('La respuesta de Ollama no contiene un JSON válido');
@@ -101,7 +99,7 @@ export async function POST(request: NextRequest) {
   try {
     // 4.1 Leer el cuerpo de la solicitud
     const body = await request.json();
-    console.log('📩 Datos recibidos en /api/triage:', body);
+    console.log('📩 Datos del paciente recibidos en /api/triage:', body.nombre, body.motivo);
 
     // 4.2 Validar campos obligatorios
     const camposRequeridos: (keyof DatosPaciente)[] = [
@@ -117,33 +115,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4.3 Construir el prompt con los datos del paciente
-    const prompt = construirPrompt(body as DatosPaciente);
-    console.log('📝 Prompt enviado a Ollama:', prompt);
+    // 4.3 Recuperar contexto semántico de protocolos clínicos vía RAG
+    console.log('📚 Consultando base de conocimiento RAG para este paciente...');
+    const { contexto, fuentes } = await recuperarContextoTriage(body as DatosPacienteRAG);
+    console.log('✅ RAG recuperó fuentes:', fuentes);
 
-    // 4.4 Consultar a Ollama
+    // 4.4 Construir el prompt enriquecido con las guías clínicas
+    const prompt = construirPromptRAG(body as DatosPaciente, contexto);
+
+    // 4.5 Consultar a Ollama (gemma2)
     let resultado;
     try {
       resultado = await consultarOllama(prompt);
+      
+      // Asegurarse de que las fuentes recuperadas por RAG estén presentes en el resultado
+      if (!resultado.fuentes_rag || !Array.isArray(resultado.fuentes_rag) || resultado.fuentes_rag.length === 0) {
+        resultado.fuentes_rag = fuentes;
+      }
     } catch (ollamaError: any) {
       console.error('❌ Error al consultar Ollama:', ollamaError.message);
       
-      // Si falla Ollama, devolvemos un resultado simulado (para no dejar al usuario sin respuesta)
       resultado = {
         nivel: 'III',
         color: 'AMARILLO',
         emoji: '🟡',
         clase_css: 'nivel-amarillo',
-        justificacion: `No se pudo conectar con el modelo de IA (${ollamaError.message}). Se devuelve resultado simulado.`,
+        justificacion: `No se pudo conectar con el modelo de IA (${ollamaError.message}). Se devuelve resultado de contingencia basado en reglas generales.`,
         acciones: ['Registrar signos vitales', 'Mantener en observación', 'Esperar evaluación médica'],
         alarmas: ['Dificultad respiratoria', 'Pérdida de conocimiento', 'Dolor intenso'],
-        tiempo_espera: '30 minutos'
+        tiempo_espera: '30 a 60 minutos',
+        fuentes_rag: fuentes
       };
     }
 
-    console.log('✅ Resultado del triage:', resultado);
+    console.log('✅ Resultado del triage con RAG:', resultado.nivel, resultado.color);
 
-    // 4.5 Devolver la respuesta al frontend
+    // 4.6 Devolver la respuesta al frontend con la información del RAG
     return NextResponse.json({ 
       datos: body, 
       resultado 
@@ -163,3 +170,17 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// ============================================================
+// 5. Endpoint GET para verificar estado del RAG
+// ============================================================
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    sistema: 'Triage Clínico con RAG',
+    knowledge_base: 'knowledge_base/triage',
+    embed_model: 'nomic-embed-text',
+    llm_model: 'gemma2'
+  });
+}
+
