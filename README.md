@@ -1,257 +1,134 @@
-Fully local chat-with-pdf app using LlamaIndexTS, Ollama, Next.JS.
+# 🏥 TriageAI — Sistema Inteligente de Triage Clínico con RAG Local
 
-### Use Case
-My main driver was to optimize the review of contracts and invoices to identify legal gaps, compliance issues, and potential risks, such as missing clauses, non-standard terms, or deviations from standard templates. This is a chat-based version but can be followed as the foundation to turn it into a Web Service API that can be plugged to enterprise systems.
+**TriageAI** es una plataforma clínica de soporte a la decisión médica para la evaluación, clasificación y priorización de pacientes en servicios de urgencias. El sistema combina modelos de lenguaje locales (LLM) con una arquitectura **RAG (Retrieval-Augmented Generation)** fundamentada en protocolos médicos oficiales como el **Sistema Manchester de Triage (MTS)**, escalas **NEWS2** y guías de actuación para patologías críticas (Síndrome Coronario Agudo, ACV/Código Ictus, Sepsis, Insuficiencia Respiratoria, etc.).
 
-### Stack used:
-- **NodeJS** +20
-- **LlamaIndex TS** as the RAG framework
-- **Ollama** to locally run LLM and embed models
-- **nomic-text-embed** with Ollama as the embed model
-- **gemma2** with Ollama as the LLM
-- **Next.JS** with **server actions**
-- **PDFObject** to preview PDF with auto-scroll to relevant page
-- **LangChain** WebPDFLoader to parse the PDF
+---
 
-### Structure 
-![screenshot](scheme-AI-PDF-Chat.png)
+## 🚀 Características Principales
 
-### Install Ollama
+1. **Clasificación Basada en Evidencia (RAG Local):**
+   * El modelo no califica "de memoria" ni alucina criterios: contrasta las constantes vitales y síntomas con normativas oficiales almacenadas en `knowledge_base/triage/`.
+   * Cita explícitamente los protocolos y discriminadores aplicados en el campo de justificación médica.
+   * Admite ampliación dinámica de la base de conocimiento agregando archivos `.md`, `.txt` o documentos `.pdf`.
 
-Go to https://ollama.com/ and download Ollama for your specific operative system.
+2. **5 Niveles de Prioridad Médica (Sistema Manchester MTS):**
+   * 🔴 **Nivel I - Reanimación (Rojo):** Riesgo vital inmediato (0 minutos / Inmediato).
+   * 🟠 **Nivel II - Emergencia / Muy Urgente (Naranja):** Riesgo potencial o dolor severo (10 a 15 minutos).
+   * 🟡 **Nivel III - Urgente (Amarillo):** Paciente con patología aguda o requerimiento diagnóstico (30 a 60 minutos).
+   * 🟢 **Nivel IV - Menos Urgente (Verde):** Complejidad baja sin riesgo vital (120 minutos).
+   * 🔵 **Nivel V - No Urgente (Azul):** Problemas crónicos o administrativos (240 minutos).
 
-### Download nomic and gemma2 model weights
+3. **Módulo de Historial Clínico (`/historial`):**
+   * Registro persistente en `localStorage` de todas las evaluaciones realizadas.
+   * Dashboard con métricas de pacientes críticos, urgentes y leves.
+   * Buscador en tiempo real por Nombre, DNI o Motivo de consulta.
+   * Filtros interactivos por nivel de urgencia.
+   * Visualización histórica de fichas de triage e impresión clínica directa.
+   * Descarga y exportación completa del historial en formato `.json`.
 
-For this, I picked `gemma2` as the LLM and `nomic-embed-text` as the embed model.
+4. **100% Privado y Offline:**
+   * Toda la inferencia y vectorización se realiza localmente mediante **Ollama**, sin enviar datos sensibles de pacientes a servicios en la nube.
 
-To use the model, first we need to download their weights.
+---
+
+## 🛠️ Stack Tecnológico
+
+* **Frontend & Backend Web:** [Next.js](https://nextjs.org/) (App Router, React 18, TailwindCSS).
+* **Framework RAG:** [LlamaIndex.TS](https://ts.llamaindex.ai/) (Índices vectoriales y búsqueda semántica).
+* **Inferencia Local (LLM):** [Ollama](https://ollama.com/) con el modelo `gemma2`.
+* **Modelo de Embeddings:** `nomic-embed-text` a través de Ollama.
+* **Procesamiento de Documentos:** Soporte nativo para Markdown y extracción de texto en PDFs (`pdf-parse`).
+
+---
+
+## 📋 Requisitos Previos
+
+1. **Node.js:** Versión 18 o superior (se recomienda Node 20+).
+2. **Ollama:** Instalado en el sistema operativo ([descargar aquí](https://ollama.com/)).
+
+---
+
+## ⚙️ Instalación y Puesta en Marcha
+
+### 1. Descargar los modelos en Ollama
+
+Abre una terminal y descarga los modelos requeridos:
 
 ```bash
-$ ollama pull gemma2
+# Modelo de razonamiento y clasificación clínica
+ollama pull gemma2
 
-$ ollama pull nomic-embed-text
+# Modelo de embeddings vectoriales para el RAG
+ollama pull nomic-embed-text
 ```
 
-After the models are pulled, you can generate your custom model (using a modelfile)
+Asegúrate de que el servicio de Ollama esté ejecutándose:
 ```bash
-$ ollama create argano-contract-assistant -f modelfile
-```
-"argano-contract-assistant" is the model referenced in our code which is based in gemma2.
-
-But feel free to use any model you want from here: https://ollama.com/library . This needs to be pointed in actions.ts file.
-
-### `FilePicker.tsx` - Drag-n-drop the PDF
-
-This component is the entry-point to our app.
-
-It's used for uploading the pdf file, either clicking the upload button or drag-and-drop the PDF file.
-
-```ts
-  return (
-    <div
-      className='flex flex-col gap-7 justify-center items-center h-[80vh]'>
-      <Label htmlFor="pdf" className="text-xl font-bold tracking-tight text-gray-600 cursor-pointer">
-        Select PDF to chat
-      </Label>
-      <Input
-        onDragOver={() => setStatus("Drop PDF file to chat")}
-        onDragLeave={() => setStatus("")}
-        onDrop={handleFileDrop}
-        id="pdf"
-        type="file"
-        accept='.pdf'
-        className="cursor-pointer"
-        onChange={(e) => {
-          if (e.target.files) {
-            setSelectedFile(e.target.files[0])
-            setPage(1)
-          }
-        }}
-      />
-      <div className="text-lg font-medium">{status}</div>
-    </div>
-  )
-```
-After successfully upload, it sets the state variable `selectedFile` to the newly uploaded file.
-
-
-### `Preview.tsx` - Preview of the PDF
-
-Once the state variable `selectedFile` is set, `ChatWindow` and `Preview` components are rendered instead of `FilePicker`
-
-First we get the base64 string of the pdf from the `File` using `FileReader`. Next we use this base64 string to preview the pdf.
-
-Preview component uses `PDFObject` package to render the PDF.
-
-It also takes `page` as prop to scroll to the relevant page. It's set to 1 initially and then updated as we chat with the PDF.
-
-```ts
-  useEffect(() => {
-    const options = {
-      title: fileToPreview.name,
-      pdfOpenParams: {
-        view: "fitH",
-        page: page || 1,
-        zoom: "scale,left,top",
-        pageMode: 'none'
-      }
-    }
-    console.log(`Page: ${page}`)
-    const reader = new FileReader()
-    reader.onload = () => {
-      setb64String(reader.result as string);
-    }
-    reader.readAsDataURL(fileToPreview)
-    pdfobject.embed(b64String as string, "#pdfobject", options)
-  }, [page, b64String])
-
-  return (
-    <div className="flex-grow roundex-xl" id="pdfobject">
-    </div>
-  )
+ollama serve
 ```
 
+### 2. Instalar dependencias del proyecto
 
-### `ProcessPDF()` Next.JS server action
+En la raíz del proyecto, ejecuta:
 
-We also have to process the PDF for RAG.
-
-We first use `LangChain` `WebPDFLoader` to parse the uploaded PDF. We use `WebPDFLoader` because it runs on the browser and don't require node.js.
-
-```ts
-const loader = new WebPDFLoader(
-  selectedFile,
-  { parsedItemSeparator: " " }
-);
-const lcDocs = (await loader.load()).map(lcDoc => ({
-  pageContent: lcDoc.pageContent,
-  metadata: lcDoc.metadata,
-}))
+```bash
+npm install
 ```
 
-### RAG using LlamaIndex TS
+### 3. Iniciar el entorno de desarrollo
 
-Next, we pass the parsed documents to a Next.JS server action that initiates the RAG pipeline using `LlamaIndex TS`
-```ts
-if (lcDocs.length == 0) return;
-const docs = lcDocs.map(lcDoc => new Document({
-    text: lcDoc.pageContent,
-    metadata: lcDoc.metadata
-}))
-```
-we create LlamaIndex Documents from the parsed documents.
-
-#### Vector Store Index
-
-Next we create a `VectorStoreIndex` with those Documents, passing configuration info like which embed model and llm to use.
-```ts
-  const index = await VectorStoreIndex.fromDocuments(docs, {
-    serviceContext: serviceContextFromDefaults({
-      chunkSize: 300,
-      chunkOverlap: 20,
-      embedModel, llm
-    })
-  })
+```bash
+npm run dev
 ```
 
-We use Ollama for LLM and OllamaEmbedding for embed model
+La aplicación quedará disponible en:
+👉 **[http://localhost:3000](http://localhost:3000)** (redirige automáticamente a `/triage`).
 
-```ts
-const embedModel = new OllamaEmbedding({
-  model: 'nomic-embed-text'
-})
+---
 
-const llm = new Ollama({
-  model: "phi",
-  modelMetadata: {
-    temperature: 0,
-    maxTokens: 25,
-  }
-})
+## 🗂️ Estructura del Proyecto
+
+```text
+Triage-y-Pdfs/
+├── app/
+│   ├── api/triage/route.ts      # Endpoint de evaluación (recuperación RAG + Ollama)
+│   ├── historial/page.tsx       # Página del historial clínico de pacientes
+│   ├── triage/
+│   │   ├── page.tsx             # Formulario de nuevo paciente
+│   │   ├── resultado/page.tsx   # Ficha de resultado de triage
+│   │   └── historial/page.tsx   # Ruta alternativa de historial
+│   ├── layout.tsx               # Layout general con branding TriageAI y barra de navegación
+│   └── page.tsx                 # Redirección raíz a /triage
+├── components/
+│   ├── triage/
+│   │   ├── TriageForm.tsx       # Formulario con presets rápidos y badges de unidades
+│   │   ├── TriageResult.tsx     # Tarjeta de resultados, justificación y RAG consultado
+│   │   └── TriageHistory.tsx    # Dashboard, buscador, filtros y exportación
+│   └── ui/                      # Primitivas de interfaz (Button, Input, Label)
+├── knowledge_base/triage/       # Base de conocimiento normativo de Triage (RAG)
+│   ├── protocolo_manchester_mts.md
+│   ├── signos_vitales_y_escalas_alerta.md
+│   └── algoritmos_patologias_frecuentes_urgencias.md
+├── lib/
+│   ├── triage-rag.ts            # Motor LlamaIndex de indexación y búsqueda semántica
+│   ├── triage-history.ts        # Métodos de persistencia, exportación y gestión de historial
+│   └── utils.ts
+├── package.json
+└── README.md
 ```
 
-#### Vector Index Retriever
-We then create a `VectorIndexRetriever` from the `index`, which will be used to create a chat engine.
-```ts
-  const retriever = index.asRetriever({
-    similarityTopK: 2,
-  })
-  if (chatEngine) {
-    chatEngine.reset()
-  }
-```
+---
 
-#### ChatEngine
-Finally, we create a LlamaIndex `ContextChatEngine` from the `Retriever`
-```ts
-  chatEngine = new ContextChatEngine({
-    retriever,
-    chatModel: llm
-  })
-```
-we pass in the LLM as well.
+## 🧪 Pruebas Rápidas en la Interfaz
 
-### `ChatWindow.tsx`
-This component is used to handle the Chat Logic
-```ts
-  <ChatWindow
-    isLoading={isLoading}
-    loadingMessage={loadingMessage}
-    startChat={startChat}
-    messages={messages}
-    setSelectedFile={setSelectedFile}
-    setMessages={setMessages}
-    setPage={setPage}
-  />
-```
+En el formulario de **Nuevo Paciente**, dispones de botones para autocompletar casos clínicos de prueba en 1 clic:
+* **🟠 Sospecha IAM:** Dolor torácico opresivo con diaforesis → Dispara Nivel II (Naranja - 10-15 min) para ECG inmediato.
+* **🔴 Emergencia Vital:** Glasgow 7 con respiración agónica → Dispara Nivel I (Rojo - Inmediato) por vía aérea en riesgo.
+* **🟡 Sepsis Potencial:** Fiebre alta, taquipnea y taquicardia → Dispara Nivel III (Amarillo - 30-60 min).
+* **🟢 Traumatismo Leve:** Esguince de tobillo sin compromiso óseo → Dispara Nivel IV (Verde - 120 min).
 
-### `chat()` server action
-This server action used the previously created `ChatEngine` to generate chat response.
+---
 
-In addition to the text response it also returns the source nodes used to generate the response, which we'll use later to updated which page to show on the PDF preview.
+## ⚖️ Descargo de Responsabilidad (Disclaimer)
 
-```ts
-const queryResult = await chatEngine.chat({
-  message: query
-})
-const response = queryResult.response
-const metadata = queryResult.sourceNodes?.map(node => node.metadata)
-return { response, metadata };
-```
-
-### Update the page to preview from metadata
-
-We use the response and metadata from the above server action (`chat()`) to update the messages, and update the page to show in the PDF preview.
-
-```ts
-  setMessages(
-    [
-      ...messages,
-      { role: 'human', statement: input },
-      { role: 'ai', statement: response }
-    ]
-  )
-  // console.log(metadata)
-  if (metadata.length > 0) {
-    setPage(metadata[0].loc.pageNumber)
-  }
-  setLoadingMessage("Got response from AI.")
-```
-
-### Few gotchas
-
-There're a few things to consider for this project:
-- You'll need a powerful machine with decent GPU to run Ollama for faster and better responses.
-- We need to disable `fs` on `browser` otherwise `pdf-parse` will not work. We need to put this in the `webpack` section of `next.config.js`
-```ts
-if (!isServer) {
-  config.resolve.fallback = {
-    fs: false,
-    "node:fs/promises": false,
-    assert: false,
-    module: false,
-    perf_hooks: false,
-  };
-}
-```
-- Next.JS server actions don't support sending intermediate results, hence couldn't make streaming work.
+Esta aplicación es una prueba de concepto tecnológica y herramienta de soporte asistencial orientada a la investigación y el entrenamiento. **No reemplaza en ningún caso el juicio clínico de un profesional de la salud matriculado.**
