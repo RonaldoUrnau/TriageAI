@@ -7,6 +7,8 @@ import {
   eliminarRegistroPorId,
   limpiarTodoHistorial,
   descargarHistorialJSON,
+  COLOR_STYLES_TRIAGE,
+  formatearFechaTriage,
   RegistroHistorialTriage,
 } from "@/lib/triage-history";
 
@@ -62,14 +64,6 @@ export default function TriageHistory() {
   const leves = historial.filter(
     (h) => h.resultado.nivel === "IV" || h.resultado.nivel === "V"
   ).length;
-
-  const colorStyles: Record<string, { bg: string; badge: string; border: string }> = {
-    "nivel-rojo": { bg: "bg-red-50", badge: "bg-red-600 text-white", border: "border-red-200" },
-    "nivel-naranja": { bg: "bg-orange-50", badge: "bg-orange-500 text-white", border: "border-orange-200" },
-    "nivel-amarillo": { bg: "bg-yellow-50", badge: "bg-yellow-500 text-slate-900 font-bold", border: "border-yellow-200" },
-    "nivel-verde": { bg: "bg-emerald-50", badge: "bg-emerald-600 text-white", border: "border-emerald-200" },
-    "nivel-azul": { bg: "bg-blue-50", badge: "bg-blue-600 text-white", border: "border-blue-200" },
-  };
 
   if (!cargado) {
     return (
@@ -221,11 +215,8 @@ export default function TriageHistory() {
       ) : (
         <div className="space-y-3">
           {registrosFiltrados.map((item) => {
-            const estilo = colorStyles[item.resultado.clase_css] || colorStyles["nivel-amarillo"];
-            const fecha = new Date(item.timestamp).toLocaleString("es-ES", {
-              dateStyle: "medium",
-              timeStyle: "short",
-            });
+            const estilo = COLOR_STYLES_TRIAGE[item.resultado.clase_css] || COLOR_STYLES_TRIAGE["nivel-amarillo"];
+            const fecha = formatearFechaTriage(item.timestamp);
 
             return (
               <div

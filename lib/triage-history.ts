@@ -32,6 +32,53 @@ export interface RegistroHistorialTriage {
   resultado: ResultadoTriage;
 }
 
+export interface EstiloNivelTriage {
+  bg: string;
+  border: string;
+  text: string;
+  badge: string;
+}
+
+export const COLOR_STYLES_TRIAGE: Record<string, EstiloNivelTriage> = {
+  "nivel-rojo": {
+    bg: "bg-red-50",
+    border: "border-red-500",
+    text: "text-red-900",
+    badge: "bg-red-600 text-white",
+  },
+  "nivel-naranja": {
+    bg: "bg-orange-50",
+    border: "border-orange-500",
+    text: "text-orange-900",
+    badge: "bg-orange-500 text-white",
+  },
+  "nivel-amarillo": {
+    bg: "bg-yellow-50",
+    border: "border-yellow-500",
+    text: "text-yellow-900",
+    badge: "bg-yellow-500 text-slate-900 font-bold",
+  },
+  "nivel-verde": {
+    bg: "bg-emerald-50",
+    border: "border-emerald-500",
+    text: "text-emerald-900",
+    badge: "bg-emerald-600 text-white",
+  },
+  "nivel-azul": {
+    bg: "bg-blue-50",
+    border: "border-blue-500",
+    text: "text-blue-900",
+    badge: "bg-blue-600 text-white",
+  },
+};
+
+export function formatearFechaTriage(timestamp: string): string {
+  return new Date(timestamp).toLocaleString("es-ES", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 const STORAGE_KEY = "triage_ai_history";
 
 /**

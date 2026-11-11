@@ -135,9 +135,6 @@ export default function TriageForm() {
       // Guardar de forma persistente en el historial
       const nuevoRegistro = guardarEnHistorial(data.datos || formData, data.resultado);
 
-      // Guardar también en sessionStorage para transición directa
-      sessionStorage.setItem("resultadoTriage", JSON.stringify(nuevoRegistro));
-
       // Navegar a resultados pasando el ID del registro
       router.push(`/triage/resultado?id=${nuevoRegistro.id}`);
     } catch (err) {

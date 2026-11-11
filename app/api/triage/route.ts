@@ -1,29 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { recuperarContextoTriage, DatosPacienteRAG } from '@/lib/triage-rag';
+import { recuperarContextoTriage } from '@/lib/triage-rag';
+import type { DatosPaciente, ResultadoTriage } from '@/lib/triage-history';
 
 export const dynamic = 'force-dynamic';
 
-// ============================================================
-// 1. Definimos la estructura de datos que esperamos del frontend
-// ============================================================
-interface DatosPaciente {
-  nombre: string;
-  edad: string;
-  sexo: string;
-  dni: string;
-  motivo: string;
-  fc: string;
-  fr: string;
-  spo2: string;
-  ta: string;
-  temp: string;
-  glasgow: string;
-  antecedentes: string;
-}
 
-// ============================================================
-// 2. Función para construir el prompt enriquecido con RAG para Ollama
-// ============================================================
+// 1. Función para construir el prompt enriquecido con RAG para Ollama
+
 function construirPromptRAG(datos: DatosPaciente, contextoRAG: string): string {
   return `
 Eres un médico experto en Triage de Urgencias. Clasifica al paciente según los siguientes protocolos de referencia:
@@ -51,14 +34,14 @@ Devuelve EXCLUSIVAMENTE un JSON válido (sin explicaciones adicionales fuera del
 }`;
 }
 
-// ============================================================
-// 3. Función para consultar Ollama
-// ============================================================
-async function consultarOllama(prompt: string): Promise<any> {
-  const url = process.env.OLLAMA_BASE_URL 
+
+// 2. Función para consultar Ollama
+
+async function consultarOllama(prompt: string): Promise<ResultadoTriage> {
+  const url = process.env.OLLAMA_BASE_URL
     ? `${process.env.OLLAMA_BASE_URL}/api/chat`
     : 'http://127.0.0.1:11434/api/chat';
-  
+
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -83,7 +66,7 @@ async function consultarOllama(prompt: string): Promise<any> {
 
   const data = await response.json();
   const content = data.message?.content || '';
-  
+
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     throw new Error('La respuesta de Ollama no contiene un JSON válido');
@@ -92,9 +75,9 @@ async function consultarOllama(prompt: string): Promise<any> {
   return JSON.parse(jsonMatch[0]);
 }
 
-// ============================================================
+
 // 4. Endpoint POST
-// ============================================================
+
 export async function POST(request: NextRequest) {
   try {
     // 4.1 Leer el cuerpo de la solicitud
@@ -117,24 +100,24 @@ export async function POST(request: NextRequest) {
 
     // 4.3 Recuperar contexto semántico de protocolos clínicos vía RAG
     console.log('📚 Consultando base de conocimiento RAG para este paciente...');
-    const { contexto, fuentes } = await recuperarContextoTriage(body as DatosPacienteRAG);
+    const { contexto, fuentes } = await recuperarContextoTriage(body as DatosPaciente);
     console.log('✅ RAG recuperó fuentes:', fuentes);
 
     // 4.4 Construir el prompt enriquecido con las guías clínicas
     const prompt = construirPromptRAG(body as DatosPaciente, contexto);
 
     // 4.5 Consultar a Ollama (gemma2)
-    let resultado;
+    let resultado: ResultadoTriage;
     try {
       resultado = await consultarOllama(prompt);
-      
+
       // Asegurarse de que las fuentes recuperadas por RAG estén presentes en el resultado
       if (!resultado.fuentes_rag || !Array.isArray(resultado.fuentes_rag) || resultado.fuentes_rag.length === 0) {
         resultado.fuentes_rag = fuentes;
       }
     } catch (ollamaError: any) {
       console.error('❌ Error al consultar Ollama:', ollamaError.message);
-      
+
       resultado = {
         nivel: 'III',
         color: 'AMARILLO',
@@ -151,9 +134,9 @@ export async function POST(request: NextRequest) {
     console.log('✅ Resultado del triage con RAG:', resultado.nivel, resultado.color);
 
     // 4.6 Devolver la respuesta al frontend con la información del RAG
-    return NextResponse.json({ 
-      datos: body, 
-      resultado 
+    return NextResponse.json({
+      datos: body,
+      resultado
     });
 
   } catch (error: any) {
@@ -171,9 +154,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ============================================================
+
 // 5. Endpoint GET para verificar estado del RAG
-// ============================================================
+
 export async function GET() {
   return NextResponse.json({
     status: 'ok',
@@ -183,4 +166,4 @@ export async function GET() {
     llm_model: 'gemma2'
   });
 }
-
+

@@ -9,5 +9,3 @@ declare module 'pdf-parse' {
   }>;
   export = pdf;
 }
-
-declare module 'pdfobject';

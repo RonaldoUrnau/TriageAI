@@ -89,14 +89,13 @@ La aplicación quedará disponible en:
 ## 🗂️ Estructura del Proyecto
 
 ```text
-Triage-y-Pdfs/
+TriageAI/
 ├── app/
 │   ├── api/triage/route.ts      # Endpoint de evaluación (recuperación RAG + Ollama)
 │   ├── historial/page.tsx       # Página del historial clínico de pacientes
 │   ├── triage/
 │   │   ├── page.tsx             # Formulario de nuevo paciente
-│   │   ├── resultado/page.tsx   # Ficha de resultado de triage
-│   │   └── historial/page.tsx   # Ruta alternativa de historial
+│   │   └── resultado/page.tsx   # Ficha de resultado de triage
 │   ├── layout.tsx               # Layout general con branding TriageAI y barra de navegación
 │   └── page.tsx                 # Redirección raíz a /triage
 ├── components/
@@ -111,8 +110,9 @@ Triage-y-Pdfs/
 │   └── algoritmos_patologias_frecuentes_urgencias.md
 ├── lib/
 │   ├── triage-rag.ts            # Motor LlamaIndex de indexación y búsqueda semántica
-│   ├── triage-history.ts        # Métodos de persistencia, exportación y gestión de historial
+│   ├── triage-history.ts        # Tipos compartidos, estilos de nivel y persistencia de historial
 │   └── utils.ts
+├── tailwind.config.ts
 ├── package.json
 └── README.md
 ```

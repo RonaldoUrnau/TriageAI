@@ -5,28 +5,13 @@ import { VectorStoreIndex } from "llamaindex/indices/vectorStore/index";
 import { OllamaEmbedding } from "llamaindex/embeddings/OllamaEmbedding";
 import { Ollama } from "llamaindex/llm/ollama";
 import { serviceContextFromDefaults } from "llamaindex/ServiceContext";
-
-export interface DatosPacienteRAG {
-  nombre?: string;
-  edad: string;
-  sexo?: string;
-  dni?: string;
-  motivo: string;
-  fc: string;
-  fr: string;
-  spo2: string;
-  ta: string;
-  temp: string;
-  glasgow: string;
-  antecedentes?: string;
-}
+import type { DatosPaciente } from "@/lib/triage-history";
 
 export interface ResultadoRAG {
   contexto: string;
   fuentes: string[];
 }
 
-const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
 const KNOWLEDGE_DIR = path.join(process.cwd(), "knowledge_base", "triage");
 
 // Cache en memoria para mantener el índice activo en el servidor
@@ -47,7 +32,7 @@ async function cargarDocumentosTriage(): Promise<Document[]> {
   const files = await fs.promises.readdir(KNOWLEDGE_DIR);
 
   for (const file of files) {
-    // Ignorar README u ocultos
+
     if (file.toLowerCase() === "readme.md" || file.startsWith(".")) {
       continue;
     }
@@ -177,7 +162,7 @@ export function invalidarIndiceTriage() {
 /**
  * Construye una consulta semántica inteligente basada en los síntomas y signos del paciente
  */
-function construirQueryBusqueda(datos: DatosPacienteRAG): string {
+function construirQueryBusqueda(datos: DatosPaciente): string {
   const terminos: string[] = [];
 
   terminos.push(datos.motivo);
@@ -231,7 +216,7 @@ function construirQueryBusqueda(datos: DatosPacienteRAG): string {
 /**
  * Recupera el contexto clínico relevante de la base de conocimiento usando RAG
  */
-export async function recuperarContextoTriage(datos: DatosPacienteRAG): Promise<ResultadoRAG> {
+export async function recuperarContextoTriage(datos: DatosPaciente): Promise<ResultadoRAG> {
   try {
     const index = await obtenerIndiceTriage();
     const query = construirQueryBusqueda(datos);

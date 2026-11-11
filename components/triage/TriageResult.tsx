@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   obtenerRegistroPorId,
-  DatosPaciente,
-  ResultadoTriage,
+  obtenerHistorial,
+  COLOR_STYLES_TRIAGE,
+  formatearFechaTriage,
   RegistroHistorialTriage,
 } from "@/lib/triage-history";
 
@@ -18,32 +19,9 @@ export default function TriageResult() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    // 1. Intentar cargar por ID desde el historial
-    if (id) {
-      const reg = obtenerRegistroPorId(id);
-      if (reg) {
-        setRegistro(reg);
-        return;
-      }
-    }
-
-    // 2. Intentar cargar desde sessionStorage (sesión actual)
-    const stored = sessionStorage.getItem("resultadoTriage");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (parsed.resultado && parsed.datos) {
-          setRegistro({
-            id: parsed.id || "eval_temp",
-            timestamp: parsed.timestamp || new Date().toISOString(),
-            datos: parsed.datos,
-            resultado: parsed.resultado,
-          });
-          return;
-        }
-      } catch {
-        setError("Error al leer los datos de la evaluación.");
-      }
+    const reg = id ? obtenerRegistroPorId(id) : obtenerHistorial()[0] || null;
+    if (reg) {
+      setRegistro(reg);
     } else {
       setError("No se encontraron datos de la evaluación clínica.");
     }
@@ -85,45 +63,9 @@ export default function TriageResult() {
 
   const { datos, resultado, timestamp } = registro;
 
-  const colorStyles: Record<string, { bg: string; border: string; text: string; badge: string }> = {
-    "nivel-rojo": {
-      bg: "bg-red-50",
-      border: "border-red-500",
-      text: "text-red-900",
-      badge: "bg-red-600 text-white",
-    },
-    "nivel-naranja": {
-      bg: "bg-orange-50",
-      border: "border-orange-500",
-      text: "text-orange-900",
-      badge: "bg-orange-500 text-white",
-    },
-    "nivel-amarillo": {
-      bg: "bg-yellow-50",
-      border: "border-yellow-500",
-      text: "text-yellow-900",
-      badge: "bg-yellow-500 text-slate-900 font-bold",
-    },
-    "nivel-verde": {
-      bg: "bg-emerald-50",
-      border: "border-emerald-500",
-      text: "text-emerald-900",
-      badge: "bg-emerald-600 text-white",
-    },
-    "nivel-azul": {
-      bg: "bg-blue-50",
-      border: "border-blue-500",
-      text: "text-blue-900",
-      badge: "bg-blue-600 text-white",
-    },
-  };
+  const estiloNivel = COLOR_STYLES_TRIAGE[resultado.clase_css] || COLOR_STYLES_TRIAGE["nivel-amarillo"];
 
-  const estiloNivel = colorStyles[resultado.clase_css] || colorStyles["nivel-amarillo"];
-
-  const fechaFormateada = new Date(timestamp).toLocaleString("es-ES", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const fechaFormateada = formatearFechaTriage(timestamp);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
